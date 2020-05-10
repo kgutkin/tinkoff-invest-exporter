@@ -14,7 +14,6 @@ def export_header_columns_indexes(sheet, connection):
     headers = None
     for row in sheet.iter_rows(min_row=MIN_ROW - 1, max_row=MIN_ROW - 1, min_col=1, max_col=MAX_COL):
         headers = [(i, str(col.value).replace('\n', '')) for i, col in enumerate(row) if col.value is not None]
-        break
 
     cursor = connection.cursor()
 
@@ -123,7 +122,3 @@ def read_settings_from_db():
     settings = cursor.execute("select * from settings").fetchall()
     connection.close()
     return {setting[0]: setting[1] for setting in settings}
-
-
-if __name__ == '__main__':
-    export2db("./files/broker_rep.xlsx")
