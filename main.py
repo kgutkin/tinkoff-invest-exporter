@@ -14,8 +14,6 @@ def parse_args():
                         help='CREDENTIALS - path to credentials.json file for access to Google API')
     parser.add_argument('--spreadsheet-id', '-id', dest='spreadsheetId',
                         help='SPREADSHEETID - Google Sheet Spreadsheet ID in which will be store transactions data')
-    parser.add_argument('--rub-sheet-id', '-rub', dest='rubSheetId', help='RUB template sheet id')
-    parser.add_argument('--usd-sheet-id', '-usd', dest='usdSheetId', help='USD template sheet id')
     parser.add_argument('--store-args-to-db', dest='storeArgs', action='store_true', help='store args to sqlite DB')
     args = parser.parse_args()
 

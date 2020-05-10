@@ -23,19 +23,14 @@ class TinkoffExporter:
         settings = read_settings_from_db()
 
         self.spreadsheet_id = args.spreadsheetId or settings.get('spreadsheetId')
-        self.currency_template_sheet_id = {'RUB': args.rubSheetId or settings.get('rubSheetId'),
-                                           'USD': args.usdSheetId or settings.get('usdSheetId')}
+        self.currency_template_sheet_id = {'RUB': '', 'USD': ''}
         self.credentials_path = args.credentials or settings.get('credentials')
         self.report_file_name = args.fileName
 
         if self.spreadsheet_id is None:
-            raise Exception('spreadsheet_id required! You ned specify it.\nRun with --help for more information')
-        if self.currency_template_sheet_id['RUB'] is None:
-            raise Exception('rubSheetId required! You ned specify it.\nRun with --help for more information')
-        if self.currency_template_sheet_id['USD'] is None:
-            raise Exception('usdSheetId required! You ned specify it.\nRun with --help for more information')
+            raise Exception('spreadsheet_id required! You need specify it.\nRun with --help for more information')
         if self.credentials_path is None:
-            raise Exception('credentials required! You ned specify it.\nRun with --help for more information')
+            raise Exception('credentials required! You need specify it.\nRun with --help for more information')
 
         self.sheets_api = self.__get_google_sheets_api()
 
@@ -50,14 +45,14 @@ class TinkoffExporter:
 
         spreadsheet = self.sheets_api.get(spreadsheetId=self.spreadsheet_id).execute()
         sheet_list = spreadsheet['sheets']
-        google_sheet_titles = [sheet['properties']['title'] for sheet in sheet_list]
-
+        sheet_id_by_titles = {sheet['properties']['title']: sheet['properties']['sheetId'] for sheet in sheet_list}
+        self.__init_curency_template_sheets(sheet_id_by_titles)
         header_names = read_header_names_from_db()
 
-        count_sheets = len(google_sheet_titles)
+        count_sheets = len(sheet_id_by_titles)
         for (ticker, transactions) in dictionary.items():
             values = [row[:len(header_names)] for row in transactions]
-            if ticker not in google_sheet_titles:
+            if ticker not in sheet_id_by_titles:
                 self.__duplicate_sheet(count_sheets, ticker,
                                        self.currency_template_sheet_id[list(transactions[0])[self.currency_index]])
                 count_sheets += 1
@@ -122,8 +117,8 @@ class TinkoffExporter:
             } for price_column_index in [9, 12, 13, 14, 16]]
         }).execute()
 
-    def __duplicate_sheet(self, sheet_index, sheets_api, new_sheet_name, source_sheet_id):
-        return sheets_api.batchUpdate(spreadsheetId=self.spreadsheet_id, body={
+    def __duplicate_sheet(self, sheet_index, new_sheet_name, source_sheet_id):
+        return self.sheets_api.batchUpdate(spreadsheetId=self.spreadsheet_id, body={
             'requests': [{
                 "duplicateSheet": {
                     "sourceSheetId": source_sheet_id,
@@ -132,3 +127,38 @@ class TinkoffExporter:
                 }
             }]
         }).execute()
+
+    def __init_curency_template_sheets(self, sheet_id_by_titles):
+        usd_template_title = 'Шаблон USD'
+        rub_template_title = 'Шаблон RUB'
+        templates_spreadsheet_id = '1jTFV5BDQh11PQVw7HKvQhAHswhcFQAMw_WOt6QvI5C0'
+
+        if usd_template_title in sheet_id_by_titles:
+            self.currency_template_sheet_id['USD'] = sheet_id_by_titles[usd_template_title]
+        else:
+            self.currency_template_sheet_id['USD'] = self.__copy_sheet_from(templates_spreadsheet_id, '1882164711',
+                                                                            usd_template_title)
+
+        if rub_template_title in sheet_id_by_titles:
+            self.currency_template_sheet_id['RUB'] = sheet_id_by_titles[rub_template_title]
+        else:
+            self.currency_template_sheet_id['RUB'] = self.__copy_sheet_from(templates_spreadsheet_id, '980318168',
+                                                                            rub_template_title)
+
+    def __copy_sheet_from(self, spreadsheet_id, sheet_id, title):
+        result = self.sheets_api.sheets().copyTo(spreadsheetId=spreadsheet_id, sheetId=sheet_id,
+                                        body={'destination_spreadsheet_id': self.spreadsheet_id}).execute()
+        self.sheets_api.batchUpdate(spreadsheetId=self.spreadsheet_id, body={
+            'requests': [{
+                'updateSheetProperties': {
+                    'properties': {
+                        'sheetId': result['sheetId'],
+                        'title': title,
+                        'index': 0
+                    },
+                    'fields': 'title,index'
+                }
+            }]
+        }).execute()
+
+        return result['sheetId']
