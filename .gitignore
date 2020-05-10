@@ -1,0 +1,12 @@
+credentials.json
+token.pickle
+
+venv/
+
+*.db
+
+*.xlsx
+
+.idea/
+
+*.iml
